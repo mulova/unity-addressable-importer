@@ -113,7 +113,7 @@ public class AddressableImportRule
     /// <summary>
     /// Returns True if given assetPath matched with the rule.
     /// </summary>
-    public bool Match(string assetPath)
+    public virtual bool Match(string assetPath)
     {
         path = path.Trim();
         if (string.IsNullOrEmpty(path))

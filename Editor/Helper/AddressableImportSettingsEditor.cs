@@ -6,14 +6,14 @@ using UnityEngine;
 
 namespace UnityAddressableImporter.Helper.Internal
 {
-	using System;
-	using System.Collections.Generic;
-	using System.Reflection;
-	using Editor.Helper;
-	using UnityEditor;
+    using System;
+    using System.Collections.Generic;
+    using System.Reflection;
+    using Editor.Helper;
+    using UnityEditor;
 
 
-	[CustomEditor(typeof(AddressableImportSettings), true), CanEditMultipleObjects]
+    [CustomEditor(typeof(AddressableImportSettings), true), CanEditMultipleObjects]
 	public class AddressableImportSettingsEditor : Editor
 	{
 		private List<MethodInfo> _methods;
