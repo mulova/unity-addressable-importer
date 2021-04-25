@@ -1,4 +1,5 @@
 ﻿#if UNITY_EDITOR
+using System.IO;
 using UnityAddressableImporter.Helper;
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Settings.GroupSchemas;
@@ -25,15 +26,19 @@ public class AddressableImportFolderSetting : ScriptableObject
     public void OnValidate()
     {
         ValidatePath();
-        UpdateRuleToSettings();
+        ApplyRule();
 
         void ValidatePath()
         {
             rule.path = $"^{dir}/.*";
             rule.matchType = AddressableImportRuleMatchType.Regex;
+            if (string.IsNullOrWhiteSpace(rule.groupName))
+            {
+                rule.groupName = Path.GetFileName(dir);
+            }
         }
 
-        void UpdateRuleToSettings()
+        void ApplyRule()
         {
             var setting = AddressableImportSettings.Instance;
             if (setting == null)
