@@ -1,9 +1,10 @@
-﻿#if UNITY_EDITOR
+﻿using System.Collections.Generic;
 using System.IO;
 using UnityAddressableImporter.Helper;
+using UnityEditor;
 using UnityEditor.AddressableAssets;
+using UnityEditor.AddressableAssets.Settings;
 using UnityEditor.AddressableAssets.Settings.GroupSchemas;
-#endif
 using UnityEngine;
 using static AddressableImporter;
 
@@ -68,11 +69,11 @@ public class AddressableImportFolderSetting : ScriptableObject
                 AddressableImporter.CreateAssetGroup<BundledAssetGroupSchema>(AddressableAssetSettingsDefaultObject.Settings, rule.groupName);
             } else
             {
-                Debug.LogError($"{rule.groupName} already exists");
+                Debug.LogError($"<color=cyan>[Addressables]</color> {rule.groupName} already exists");
             }
         } else
         {
-            Debug.LogError("Group name is empty");
+            Debug.LogError("<color=cyan>[Addressables]</color> Group name is empty");
         }
     }
 
@@ -83,16 +84,32 @@ public class AddressableImportFolderSetting : ScriptableObject
         {
             if (AddressableAssetSettingsDefaultObject.Settings.FindGroup(rule.groupName))
             {
-                FolderImporter.ReimportFolders(new[] { dir });
+                var overrided = new List<AddressableAssetEntry>();
+                AddressableAssetSettingsDefaultObject.Settings.GetAllAssets(overrided, true, FilterCurrentGroup, FilterCurrentPath);
+                if (overrided.Count == 0 || EditorUtility.DisplayDialog("Override Warning", string.Format("Following assets have already been assigned to another groups. {0}", string.Join(",", overrided.ConvertAll(o => o.address))), "Ok", "Cancel"))
+                {
+                    FolderImporter.ReimportFolders(new[] { dir });
+                    Debug.Log("<color=cyan>[Addressables]</color> Reimport Complete");
+                }
+
+                bool FilterCurrentGroup(AddressableAssetGroup g)
+                {
+                    return g.Name != rule.groupName;
+                }
+
+                bool FilterCurrentPath(AddressableAssetEntry e)
+                {
+                    return rule.Match(e.AssetPath);
+                }
             }
             else
             {
-                Debug.LogError($"{rule.groupName} doesn't exists");
+                Debug.LogError($"<color=cyan>[Addressables]</color> {rule.groupName} doesn't exists");
             }
         }
         else
         {
-            Debug.LogError("Group name is empty");
+            Debug.LogError("<color=cyan>[Addressables]</color> Group name is empty");
         }
     }
 
