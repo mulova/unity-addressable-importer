@@ -7,7 +7,7 @@ using UnityEngine;
 using static AddressableImporter;
 
 [System.Serializable]
-[CreateAssetMenu(fileName = "AddressableImportRule", menuName = "Addressable Assets/Import Rule", order = 51)]
+[CreateAssetMenu(fileName = "AddressableImportFolderRule", menuName = "Addressable Assets/Folder ImportRule", order = 51)]
 public class AddressableImportFolderSetting : ScriptableObject
 {
     public AddressableImportFolderRule rule;
