@@ -7,7 +7,6 @@ namespace UnityAddressableImporter.Helper.Internal
 {
     using System.Collections.Generic;
     using System.Reflection;
-    using Editor.Helper;
     using UnityEditor;
 
     [CustomEditor(typeof(AddressableImportFolderSetting), true), CanEditMultipleObjects]
@@ -26,7 +25,7 @@ namespace UnityAddressableImporter.Helper.Internal
 
         public override void OnInspectorGUI()
         {
-            DrawBaseEditor();
+            base.OnInspectorGUI();
 
 #if !ODIN_INSPECTOR
             if (_methods == null)
@@ -37,15 +36,6 @@ namespace UnityAddressableImporter.Helper.Internal
 
             serializedObject.ApplyModifiedProperties();
 
-        }
-
-        private void DrawBaseEditor()
-        {
-#if ODIN_INSPECTOR
-			_drawer.Draw();
-#else
-            base.OnInspectorGUI();
-#endif
         }
     }
 }

@@ -5,19 +5,24 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityAddressableImporter.Helper;
 
+#if ODIN_INSPECTOR
+using Sirenix.OdinInspector;
+#endif
 
-[CreateAssetMenu(fileName = "AddressableImportSettings", menuName = "Addressable Assets/Import Settings", order = 50)]
+[CreateAssetMenu(fileName = "AddressableImportSettings", menuName = "Addressables/Import Settings", order = 50)]
 public class AddressableImportSettings : ScriptableObject
 {
-    public const string kDefaultConfigObjectName = "addressableimportsettings";
+    public const string kConfigObjectName = "addressableimportsettings";
     public const string kDefaultPath = "Assets/AddressableAssetsData/AddressableImportSettings.asset";
 
     [Tooltip("Creates a group if the specified group doesn't exist.")]
     public bool allowGroupCreation = false;
 
+    [Space]
     [Tooltip("Rules for managing imported assets.")]
 #if ODIN_INSPECTOR
-    [Sirenix.OdinInspector.ListDrawerSettings(HideAddButton = false,Expanded = false,DraggableItems = true,HideRemoveButton = false)]
+    [ListDrawerSettings(HideAddButton = false,Expanded = false,DraggableItems = true,HideRemoveButton = false)]
+    [Searchable(FilterOptions = SearchFilterOptions.ISearchFilterableInterface)]
 #endif
     [SerializeReference]
     public List<AddressableImportRule> rules = new List<AddressableImportRule>();
@@ -60,14 +65,25 @@ public class AddressableImportSettings : ScriptableObject
         get
         {
             AddressableImportSettings so;
-            // Try to locate settings via EditorBuildSettings.
-            if (EditorBuildSettings.TryGetConfigObject(kDefaultConfigObjectName, out so))
+            // Try to locate settings from EditorBuildSettings
+            if (EditorBuildSettings.TryGetConfigObject(kConfigObjectName, out so))
                 return so;
-            // Try to locate settings via path.
+            // Try to locate settings from default path
             so = AssetDatabase.LoadAssetAtPath<AddressableImportSettings>(kDefaultPath);
-            if (so != null)
-                EditorBuildSettings.AddConfigObject(kDefaultConfigObjectName, so, true);
-            return so;
+            if (so != null) {
+                EditorBuildSettings.AddConfigObject(kConfigObjectName, so, true);
+                return so;
+            }
+            // Try to locate settings from AssetDatabase
+            var path = AssetDatabase.FindAssets($"t:{nameof(AddressableImportSettings)}");
+            if (path.Length > 0) {
+                var assetPath = AssetDatabase.GUIDToAssetPath(path[0]);
+                so = AssetDatabase.LoadAssetAtPath<AddressableImportSettings>(assetPath);
+                EditorBuildSettings.AddConfigObject(kConfigObjectName, so, true);
+                return so;
+            }
+            return null;
         }
     }
+
 }

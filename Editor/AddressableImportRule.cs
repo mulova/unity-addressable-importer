@@ -1,10 +1,13 @@
 ﻿using UnityEngine;
-using UnityEditor;
 using UnityEditor.AddressableAssets.Settings;
 using UnityEngine.AddressableAssets;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using UnityAddressableImporter.Helper;
+
+#if ODIN_INSPECTOR
+using Sirenix.OdinInspector;
+#endif
 
 public enum AddressableImportRuleMatchType
 {
@@ -35,9 +38,14 @@ public enum GroupTemplateApplicationMode
     AlwaysOverwriteGroupSettings
 }
 
+
+
 [System.Serializable]
 public class AddressableImportRule
+    : ISearchFilterable
 {
+    #region inspector
+
     /// <summary>
     /// Path pattern.
     /// </summary>
@@ -54,27 +62,8 @@ public class AddressableImportRule
     /// The group the asset will be added.
     /// </summary>
     [Tooltip("The group name in which the Addressable will be added. Leave blank for the default group.")]
+    [Space]
     public string groupName = string.Empty;
-
-    /// <summary>
-    /// Cleaned group name.
-    /// </summary>
-    string CleanedGroupName {
-        get {
-            return groupName.Trim().Replace('/', '-').Replace('\\', '-');
-        }
-    }
-
-    /// <summary>
-    /// Defines if labels will be added or replaced.
-    /// </summary>
-    public LabelWriteMode LabelMode;
-
-    /// <summary>
-    /// Label reference list.
-    /// </summary>
-    [Tooltip("The list of labels to be added to the Addressable Asset")]
-    public List<AssetLabelReference> labelRefs;
 
     /// <summary>
     /// Group template to use. Default Group settings will be used if empty.
@@ -86,13 +75,29 @@ public class AddressableImportRule
     /// Controls wether group template will be applied only on group creation, or also to already created groups.
     /// </summary>
     [Tooltip("Defines if the group template will only be applied to new groups, or will also overwrite existing groups settings.")]
+    [Label("Application Mode")]
     public GroupTemplateApplicationMode groupTemplateApplicationMode = GroupTemplateApplicationMode.ApplyOnGroupCreationOnly;
+
+    /// <summary>
+    /// Label reference list.
+    /// </summary>
+    [Tooltip("The list of addressable labels (already existing in your project) to be added to the Addressable Asset")]
+    [Space]
+    public List<AssetLabelReference> labelRefs;
+
+    [Tooltip("The list of dynamic labels to be added to the Addressable Asset. If an addressable label doesn't exist, then it will be create in your unity project")]
+    public List<string> dynamicLabels;
+
+    /// <summary>
+    /// Defines if labels will be added or replaced.
+    /// </summary>
+    public LabelWriteMode LabelMode;
 
     /// <summary>
     /// Simplify address.
     /// </summary>
     [Tooltip("Simplify address to filename without extension.")]
-    [Label("Address Simplified")]
+    [Label("Address Simplified"), Space]
     public bool simplified;
 
     /// <summary>
@@ -102,12 +107,29 @@ public class AddressableImportRule
     [ConditionalField("matchType", AddressableImportRuleMatchType.Regex, "simplified", false)]
     public string addressReplacement = string.Empty;
 
-    public bool HasLabel
+    #endregion
+
+
+    private AddressableImportFilter _filter = new AddressableImportFilter();
+    public AddressableImportFilter Filter => _filter ?? new AddressableImportFilter();
+
+
+    public bool HasLabelRefs
     {
         get
         {
             return labelRefs != null && labelRefs.Count > 0;
         }
+    }
+
+    /// <summary>
+    /// check current rule for matching with filter pattern
+    /// </summary>
+    /// <param name="searchString">filter string</param>
+    /// <returns>filter result</returns>
+    public bool IsMatch(string searchString)
+    {
+        return string.IsNullOrEmpty(searchString) || Filter.IsMatch(this,searchString);
     }
 
     /// <summary>
@@ -140,12 +162,30 @@ public class AddressableImportRule
     /// </summary>
     public string ParseGroupReplacement(string assetPath)
     {
-        if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(groupName))
+        return ParseReplacement(assetPath, groupName);
+
+    }
+
+    /// <summary>
+    /// Parse assetPath and replace all elements that match this.path regex
+    /// with the <paramref name="name"/>
+    /// Returns null if this.path or  <paramref name="name"/> is empty.
+    /// </summary>
+    /// <param name="assetPath"></param>
+    /// <param name="name"></param>
+    /// <returns></returns>
+    public string ParseReplacement(string assetPath, string name)
+    {
+        if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(name))
             return null;
+
+        var cleanedName = name.Trim().Replace('/', '-').Replace('\\', '-');
+
         // Parse path elements.
-        var replacement = AddressableImportRegex.ParsePath(assetPath, CleanedGroupName);
+        var replacement = AddressableImportRegex.ParsePath(assetPath, cleanedName);
         // Parse this.path regex.
-        if (matchType == AddressableImportRuleMatchType.Regex) {
+        if (matchType == AddressableImportRuleMatchType.Regex)
+        {
             string pathRegex = path;
             replacement = Regex.Replace(assetPath, pathRegex, replacement);
         }
@@ -172,21 +212,21 @@ public class AddressableImportRule
         // If the match type is Wildcard, the pattern will match and capture the entire path string.
         string pathRegex =
             simplified
-            ? @"(?<path>.*[/\\])+(?<filename>.+?)(?<extension>\.[^.]*$|$)"
-            : (matchType == AddressableImportRuleMatchType.Wildcard
-                ? @"(.*)"
-                : path);
+                ? @"(?<path>.*[/\\])+(?<filename>.+?)(?<extension>\.[^.]*$|$)"
+                : (matchType == AddressableImportRuleMatchType.Wildcard
+                    ? @"(.*)"
+                    : path);
         replacement =
             simplified
-            ? @"${filename}"
-            : (matchType == AddressableImportRuleMatchType.Wildcard
-                ? @"$1"
-                : replacement);
+                ? @"${filename}"
+                : (matchType == AddressableImportRuleMatchType.Wildcard
+                    ? @"$1"
+                    : replacement);
         replacement = Regex.Replace(assetPath, pathRegex, replacement);
         return replacement;
     }
 
-    public IEnumerable<string> labels
+    public IEnumerable<string> labelsRefsEnum
     {
         get
         {
@@ -264,4 +304,5 @@ public class AddressableImportRule
             return finalPath;
         }
     }
+
 }

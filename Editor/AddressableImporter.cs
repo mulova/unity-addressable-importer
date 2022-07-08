@@ -15,15 +15,31 @@ using UnityEditor.SceneManagement;
 using UnityEditor.Experimental.SceneManagement;
 #endif
 
+[InitializeOnLoad]
 public class AddressableImporter : AssetPostprocessor
 {
+    // The selection active object
+    static UnityEngine.Object selectionActiveObject = null;
+
+    static AddressableImporter()
+    {
+        Selection.selectionChanged += OnSelectionChanged;
+
+    }
+
+    static void OnSelectionChanged()
+    {
+        selectionActiveObject = Selection.activeObject;
+    }
+
     static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
     {
         // Skip if all imported and deleted assets are addressables configurations.
         var isConfigurationPass =
             (importedAssets.Length > 0 && importedAssets.All(x => x.StartsWith("Assets/AddressableAssetsData"))) &&
             (deletedAssets.Length > 0 && deletedAssets.All(x => x.StartsWith("Assets/AddressableAssetsData")));
-        if (isConfigurationPass) {
+        if (isConfigurationPass)
+        {
             return;
         }
         var settings = AddressableAssetSettingsDefaultObject.Settings;
@@ -36,34 +52,48 @@ public class AddressableImporter : AssetPostprocessor
             return;
         }
         var importSettings = AddressableImportSettings.Instance;
-        if (importSettings == null) {
-            Debug.LogWarningFormat("[AddressableImporter] import settings file not found.\nPlease go to Assets/AddressableAssetsData folder, right click in the project window and choose 'Create > Addressable Assets > Import Settings'.");
+        if (importSettings == null)
+        {
+            Debug.LogWarningFormat("[AddressableImporter] import settings file not found.\nPlease go to Assets/AddressableAssetsData folder, right click in the project window and choose 'Create > Addressables > Import Settings'.");
             return;
         }
         if (importSettings.rules == null || importSettings.rules.Count == 0)
             return;
 
+        // Cache the selection active object
+        var cachedSelectionActiveObject = selectionActiveObject;
         var dirty = false;
-
         // Apply import rules.
         var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
+#if UNITY_2020_1_OR_NEWER
+        string prefabAssetPath = prefabStage != null ? prefabStage.assetPath : null;
+#else
+        string prefabAssetPath = prefabStage != null ? prefabStage.prefabAssetPath : null;
+#endif
         foreach (var importedAsset in importedAssets)
         {
-            if (prefabStage == null || prefabStage.prefabAssetPath != importedAsset) // Ignore current editing prefab asset.
+            if (IsAssetIgnored(importedAsset))
+                continue;
+            if (prefabStage == null || prefabAssetPath != importedAsset) // Ignore current editing prefab asset.
                 dirty |= ApplyImportRule(importedAsset, null, settings, importSettings);
         }
 
         for (var i = 0; i < movedAssets.Length; i++)
         {
             var movedAsset = movedAssets[i];
+            if (IsAssetIgnored(movedAsset))
+                continue;
             var movedFromAssetPath = movedFromAssetPaths[i];
-            if (prefabStage == null || prefabStage.prefabAssetPath != movedAsset) // Ignore current editing prefab asset.
+            if (prefabStage == null || prefabAssetPath != movedAsset) // Ignore current editing prefab asset.
                 dirty |= ApplyImportRule(movedAsset, movedFromAssetPath, settings, importSettings);
         }
 
         foreach (var deletedAsset in deletedAssets)
         {
-            if (TryGetMatchedRule(deletedAsset, importSettings, out var matchedRule)) {
+            if (IsAssetIgnored(deletedAsset))
+                continue;
+            if (TryGetMatchedRule(deletedAsset, importSettings, out var matchedRule))
+            {
                 var guid = AssetDatabase.AssetPathToGUID(deletedAsset);
                 if (!string.IsNullOrEmpty(guid) && settings.RemoveAssetEntry(guid))
                 {
@@ -73,9 +103,18 @@ public class AddressableImporter : AssetPostprocessor
             }
         }
 
-        if (dirty) {
+        if (dirty)
+        {
             AssetDatabase.SaveAssets();
+            // Restore the cached selection active object to avoid the current selection being set to null by
+            // saving changed Addressable groups (#71).
+            Selection.activeObject = cachedSelectionActiveObject;
         }
+    }
+
+    static bool IsAssetIgnored(string assetPath)
+    {
+        return assetPath.EndsWith(".meta") || assetPath.EndsWith(".DS_Store") || assetPath.EndsWith("~");
     }
 
     public static AddressableAssetGroup CreateAssetGroup<SchemaType>(AddressableAssetSettings settings, string groupName)
@@ -96,7 +135,7 @@ public class AddressableImporter : AssetPostprocessor
             var entry = CreateOrUpdateAddressableAssetEntry(settings, importSettings, matchedRule, assetPath);
             if (entry != null)
             {
-                if (matchedRule.HasLabel)
+                if (matchedRule.HasLabelRefs)
                     Debug.LogFormat("[AddressableImporter] Entry created/updated for {0} with address {1} and labels {2}", assetPath, entry.address, string.Join(", ", entry.labels));
                 else
                     Debug.LogFormat("[AddressableImporter] Entry created/updated for {0} with address {1}", assetPath, entry.address);
@@ -170,9 +209,23 @@ public class AddressableImporter : AssetPostprocessor
             // Add labels
             if (rule.LabelMode == LabelWriteMode.Replace)
                 entry.labels.Clear();
-            foreach (var label in rule.labels)
+
+            if (rule.labelsRefsEnum != null)
             {
-                entry.labels.Add(label);
+                foreach (var label in rule.labelsRefsEnum)
+                {
+                    entry.labels.Add(label);
+                }
+            }
+
+            if (rule.dynamicLabels != null)
+            {
+                foreach (var dynamicLabel in rule.dynamicLabels)
+                {
+                    var label = rule.ParseReplacement(assetPath, dynamicLabel);
+                    settings.AddLabel(label);
+                    entry.labels.Add(label);
+                }
             }
         }
         return entry;
@@ -257,7 +310,7 @@ public class AddressableImporter : AssetPostprocessor
                     foreach (var file in filesToAdd)
                     {
                         // Filter out meta and DS_Store files.
-                        if (!file.EndsWith(".meta") && !file.EndsWith(".DS_Store"))
+                        if (!IsAssetIgnored(file))
                         {
                             pathsToImport.Add(file.Replace('\\', '/'));
                         }

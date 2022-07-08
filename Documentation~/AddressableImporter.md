@@ -13,7 +13,7 @@ Table of Contents
 
 ## Setup the Importer
 
-You should create a single AddressableImportSettings file located at `Assets/AddressableAssetsData/AddressableImportSettings.asset`. To create it, go to `Assets/AddressableAssetsData` folder, right click in your project window and choose `Create > Addressable Assets > Import Settings`.
+You should create a single AddressableImportSettings file located at `Assets/AddressableAssetsData/AddressableImportSettings.asset`. To create it, go to `Assets/AddressableAssetsData` folder, right click in your project window and choose `Create > Addressables > Import Settings`.
 
 ![AddressableImportSettings Create](AddressableImportSettings-Create.png)
 
@@ -29,7 +29,8 @@ Once the settings file selected, you can edit rules in the inspector window. The
   - Regex.
 - `Group Name`, leaves blank for the default group. For dynamic group see [Group Replacement](#group-replacement).
 - `Label Mode`, defines if labels will be added or replaced.
-- `Label Refs`, the labels to add.
+- `Label Refs`, The list static labels (already existing in your project) to be added to the Addressable Asset.
+- `Dynamic Labels`,The list of dynamic labels to be added to the Addressable Asset. If a label doesn't exist, then it will be create in your unity project.
 - `Address Simplified`, simplify address to filename without extension.
 - `Address Replacement`, leaves blank to use the asset path as address. For dynamic address see [Address Replacement](#address-replacement).
 
@@ -91,6 +92,20 @@ The importer always overrides existing address if
 In another word, if you are intending to manually change the address later, leave `Address Simplified` unticked, `Address Replacement` blank, and do not use `Assets/` prefix for the customized address name.
 
 ## Label Replacement
+You can add a label to your addressable asset.
+
+You can choose between:
+-  `Label Refs`: use a static label already created in Unity project
+- `Dynamic Labels`: you can automatically create label in your Unity project and add it to your addressable asset.
+  You can use the same rules to create a dynamic name group explained in [Group Replacement](#group-replacement).
+
+| Asset Path             | Rule Path                                     | Label Replacement               | Result           |
+|------------------------|-----------------------------------------------|-----------------------------------|------------------|
+| `Assets/cat/cat01.png` | `Assets/(?<category>[^/]+)/(.*)\.png` | `${category}`            | cat        |
+
+
+  For an interactive example you can watch this video: https://youtu.be/r5bCKY6TvP0
+
 
 The importer always overrides existing labels if `LabelMode = Replace`.
 
@@ -111,8 +126,18 @@ AddressableImporter.FolderImporter.ReimportFolders(new string[] { "Assets" });
 
 When both prefab mode (the preview scene for editing a prefab) and the autosave feature are enabled, every modification will cause the asset to be saved and trigger the importer, leads to slow response. For performance reasons, the importer will ignore the current editing asset.
 
-## ODIN Inspector Support
+## Odin Inspector Support
 
-Since v0.9.0, the import supports [ODIN inspector](https://assetstore.unity.com/packages/tools/utilities/odin-inspector-and-serializer-89041?aid=1011lJJH) (affiliates) to optimize the user experience. ODIN is a paid tool to boost editor plugin development. The integration allows filter or order importer rules easier. The ODIN support is optional. To enable it, just install the ODIN library.
+Since v0.9.0, the importer supports [Odin inspector](https://assetstore.unity.com/packages/tools/utilities/odin-inspector-and-serializer-89041?aid=1011lJJH) (affiliates) to optimize the user experience. Odin is a paid tool to boost editor plugin development. The integration allows filter or order importer rules easier. The Odin support is optional. To enable it, just install the Odin library.
 
-However, the ODIN support may be discontinued if the importer's UX gets improved in the future.
+Since v0.11.0, the importer only support Odin v3. Please make sure the `Scripting Define Symbols` of `Player Settings` contains `ODIN_INSPECTOR` and `ODIN_INSPECTOR_3` flags.
+
+![image](https://user-images.githubusercontent.com/125390/119212523-8700f580-baeb-11eb-8f3f-84246750152c.png)
+
+If you no longer use Odin, please remove the flags above, otherwise Unity will report a compile error:
+
+```
+error CS0246: The type or namespace name 'ISearchFilterable' could not be found (are you missing a using directive or an assembly reference?)
+```
+
+Notice that the Odin support may be moved to an additional plugin or discontinued if the importer's UX gets improved in the future.
